@@ -4,14 +4,16 @@ import { firebaseConfig } from './firebase-config.js';
 // DATA
 // ============================================================
 
+// mapX/mapY are percentage positions (0-100) on the world map stage,
+// loosely matching each country's real-world location.
 const COUNTRIES = [
-  { id: 'tw', flag: '🇹🇼', nameEn: 'Taiwan' },
-  { id: 'nz', flag: '🇳🇿', nameEn: 'New Zealand' },
-  { id: 'us', flag: '🇺🇸', nameEn: 'USA' },
-  { id: 'id', flag: '🇮🇩', nameEn: 'Indonesia' },
-  { id: 'my', flag: '🇲🇾', nameEn: 'Malaysia' },
-  { id: 'ph', flag: '🇵🇭', nameEn: 'Philippines' },
-  { id: 'fr', flag: '🇫🇷', nameEn: 'France' },
+  { id: 'tw', flag: '🇹🇼', nameEn: 'Taiwan', mapX: 86, mapY: 32 },
+  { id: 'nz', flag: '🇳🇿', nameEn: 'New Zealand', mapX: 93, mapY: 82 },
+  { id: 'us', flag: '🇺🇸', nameEn: 'USA', mapX: 20, mapY: 32 },
+  { id: 'id', flag: '🇮🇩', nameEn: 'Indonesia', mapX: 73, mapY: 70 },
+  { id: 'my', flag: '🇲🇾', nameEn: 'Malaysia', mapX: 65, mapY: 58 },
+  { id: 'ph', flag: '🇵🇭', nameEn: 'Philippines', mapX: 78, mapY: 46 },
+  { id: 'fr', flag: '🇫🇷', nameEn: 'France', mapX: 51, mapY: 20 },
 ];
 
 // Every country scene reuses the same four activity zones (percentage of stage size).
@@ -238,10 +240,16 @@ const state = {
   lastWrite: 0,
   isFirstTimeSetup: false,
   customizerReturnTo: 'worldmap',
+  sessionId: null,
+  kicked: false,
 };
 
 function nameToKey(name) {
   return name.trim().toLowerCase().replace(/\s+/g, '_').slice(0, 24);
+}
+
+function newSessionId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 function myDoc() {
@@ -254,6 +262,7 @@ function myDoc() {
     ...state.look,
     message: state.message,
     messageAt: state.messageAt,
+    sessionId: state.sessionId,
     updatedAt: Date.now(),
   };
 }
@@ -265,10 +274,23 @@ function persistLocalMemory() {
 }
 
 async function pushMyDoc(force) {
+  if (state.kicked) return;
   const now = Date.now();
   if (!force && now - state.lastWrite < WRITE_THROTTLE_MS) return;
   state.lastWrite = now;
   await backend.upsert(myDoc());
+}
+
+// If another tab/device logs in with the same name, that other session gets
+// a new sessionId and overwrites ours. When we notice our own doc now carries
+// someone else's sessionId, we back off instead of fighting over position
+// updates (which looked like "two of me" flickering on screen).
+function handleKicked() {
+  state.kicked = true;
+  state.nameKey = null;
+  stopMovementKeys();
+  loginHint.textContent = 'This name just logged in somewhere else — please enter again.';
+  showScreen('login');
 }
 
 // ============================================================
@@ -286,7 +308,10 @@ const onlinePanel = document.getElementById('onlinePanel');
 function showScreen(name) {
   state.screen = name;
   Object.entries(screens).forEach(([k, el]) => { el.style.display = (k === name) ? '' : 'none'; });
-  onlinePanel.style.display = (name === 'worldmap' || name === 'scene') ? '' : 'none';
+  // Only shown in-scene: the world map already shows an online count per
+  // country on each marker, so the list would just duplicate that there
+  // while also risking covering markers on narrow viewports.
+  onlinePanel.style.display = (name === 'scene') ? '' : 'none';
 }
 
 // ---------------- LOGIN ----------------
@@ -309,8 +334,10 @@ async function onEnter() {
   if (!key) { loginHint.textContent = 'Please type a name'; return; }
 
   loginHint.textContent = 'Logging in…';
+  state.kicked = false;
   state.name = raw.trim();
   state.nameKey = key;
+  state.sessionId = newSessionId();
 
   const existing = await backend.getPlayer(key);
   if (existing) {
@@ -429,32 +456,41 @@ document.getElementById('editLookBtnScene').addEventListener('click', () => {
 
 // ---------------- WORLD MAP ----------------
 
-const countryGrid = document.getElementById('countryGrid');
-
-function countryOf(nameKey) {
-  return state.players[nameKey]?.country;
-}
+const countryMarkers = document.getElementById('countryMarkers');
+const markerEls = new Map(); // country id -> {el, countEl}
 
 function onlinePlayers() {
   const now = Date.now();
   return Object.values(state.players).filter((p) => now - (p.updatedAt || 0) < ONLINE_TIMEOUT_MS);
 }
 
+function ensureMarkerEl(c) {
+  if (markerEls.has(c.id)) return markerEls.get(c.id);
+  const el = document.createElement('div');
+  el.className = 'country-marker';
+  el.style.left = `${c.mapX}%`;
+  el.style.top = `${c.mapY}%`;
+  el.innerHTML = `
+    <span class="marker-flag">${c.flag}</span>
+    <span class="marker-label">${c.nameEn}</span>
+    <span class="marker-count">🟢 <span class="marker-count-n">0</span></span>
+  `;
+  el.addEventListener('click', () => travelTo(c.id));
+  countryMarkers.appendChild(el);
+  const rec = { el, countEl: el.querySelector('.marker-count-n') };
+  markerEls.set(c.id, rec);
+  return rec;
+}
+
 function renderWorldMap() {
   const counts = {};
   onlinePlayers().forEach((p) => { counts[p.country] = (counts[p.country] || 0) + 1; });
 
-  countryGrid.innerHTML = '';
   COUNTRIES.forEach((c) => {
-    const card = document.createElement('div');
-    card.className = 'country-card';
-    card.innerHTML = `
-      <span class="flag">${c.flag}</span>
-      <div class="cname">${c.nameEn}</div>
-      <div class="ccount">🟢 ${counts[c.id] || 0} online</div>
-    `;
-    card.addEventListener('click', () => travelTo(c.id));
-    countryGrid.appendChild(card);
+    const rec = ensureMarkerEl(c);
+    const n = counts[c.id] || 0;
+    rec.countEl.textContent = n;
+    rec.el.classList.toggle('has-people', n > 0);
   });
 
   document.getElementById('meTagWorld').textContent = `👤 ${state.name}`;
@@ -721,6 +757,15 @@ function renderOnlinePanel() {
 
 function onPlayersUpdate(all) {
   state.players = all;
+
+  if (state.nameKey && !state.kicked) {
+    const mine = all[state.nameKey];
+    if (mine && mine.sessionId && state.sessionId && mine.sessionId !== state.sessionId) {
+      handleKicked();
+      return;
+    }
+  }
+
   if (state.screen === 'worldmap') renderWorldMap();
   if (state.screen === 'scene') renderSceneAvatars();
   renderOnlinePanel();

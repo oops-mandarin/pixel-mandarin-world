@@ -123,31 +123,66 @@ select{ cursor:pointer; }
 .scene-title{ color: var(--text); opacity:.85; flex:1; text-align:center; }
 
 /* ---------- World map ---------- */
-#screen-worldmap{ padding-top: 60px; justify-content: flex-start; }
-.worldmap-title{ font-size: 11px; margin-top: 6px; margin-bottom: 18px; }
-.country-grid{
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 16px;
-  max-width: 900px;
-  width: 100%;
-  padding: 0 12px 24px;
-  overflow-y: auto;
-  max-height: 72vh;
-}
-.country-card{
-  background: var(--panel);
+#screen-worldmap{ padding-top: 60px; justify-content: flex-start; overflow-y: auto; }
+.worldmap-title{ font-size: 11px; margin-top: 6px; margin-bottom: 18px; text-align: center; }
+
+.world-map-stage{
+  position: relative;
+  width: min(94vw, 980px);
+  aspect-ratio: 2 / 1;
+  margin: 0 auto 24px;
   border: 3px solid var(--border);
-  box-shadow: 4px 4px 0 var(--border);
-  padding: 16px 10px;
-  text-align: center;
-  cursor: pointer;
-  transition: transform .08s;
+  box-shadow: 6px 6px 0 var(--border);
+  overflow: hidden;
+  flex-shrink: 0;
 }
-.country-card:hover{ transform: translateY(-3px); }
-.country-card .flag{ font-size: 32px; display:block; margin-bottom: 8px; }
-.country-card .cname{ font-size: 10px; margin-bottom: 4px; }
-.country-card .ccount{ font-size: 9px; color: var(--accent2); }
+.world-map-svg{
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+.wm-ocean{ fill: #173a5e; }
+.wm-land{ fill: #2f6b4a; stroke: #1f4a33; stroke-width: 3; }
+
+.country-markers{ position: absolute; inset: 0; }
+.country-marker{
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  text-align: center;
+  filter: drop-shadow(2px 2px 0 rgba(0,0,0,.5));
+}
+.marker-flag{ font-size: 24px; line-height: 1; transition: transform .1s; }
+.country-marker:hover .marker-flag{ transform: scale(1.25); }
+.marker-label{
+  font-size: 7px;
+  background: rgba(13,15,34,.85);
+  padding: 2px 5px;
+  border-radius: 2px;
+  margin-top: 3px;
+  white-space: nowrap;
+}
+.marker-count{
+  font-size: 7px;
+  margin-top: 2px;
+  color: var(--text);
+  opacity: .7;
+}
+.country-marker.has-people .marker-count{ color: var(--accent2); opacity: 1; }
+.country-marker.has-people .marker-flag{ animation: marker-bounce 1.2s ease-in-out infinite; }
+@keyframes marker-bounce{
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@media (max-width: 640px){
+  .marker-flag{ font-size: 18px; }
+  .marker-label{ font-size: 6px; }
+  .marker-count{ font-size: 6px; }
+}
 
 /* ---------- Scene ---------- */
 #screen-scene{ padding:0; align-items: stretch; justify-content: flex-start; }
