@@ -69,7 +69,7 @@ const HOUSE_ICON = '🏠';
 const LOT_RADIUS = 0.18; // how far from the house a decoration may be placed
 const MAX_DECORATIONS = 10;
 
-const ONLINE_TIMEOUT_MS = 45000;
+const ONLINE_TIMEOUT_MS = 60000;
 const HEARTBEAT_MS = 15000;
 const MOVE_SPEED = 160; // px per second
 const WRITE_THROTTLE_MS = 300;
@@ -573,7 +573,12 @@ async function loadWorldMap() {
 
 function onlinePlayers() {
   const now = Date.now();
-  return Object.values(state.players).filter((p) => now - (p.updatedAt || 0) < ONLINE_TIMEOUT_MS);
+  // Always count yourself as online — a backgrounded/throttled tab can
+  // delay your own heartbeat write past the timeout even while you're
+  // still here, which used to make your own avatar vanish.
+  return Object.values(state.players).filter(
+    (p) => p.nameKey === state.nameKey || now - (p.updatedAt || 0) < ONLINE_TIMEOUT_MS
+  );
 }
 
 function ensureMarkerEl(c) {
@@ -739,7 +744,8 @@ function removeAvatarEl(nameKey) {
 function renderSceneAvatars() {
   const rect = sceneStage.getBoundingClientRect();
   const here = Object.values(state.players).filter((p) => {
-    const online = Date.now() - (p.updatedAt || 0) < ONLINE_TIMEOUT_MS;
+    const isMe = p.nameKey === state.nameKey;
+    const online = isMe || Date.now() - (p.updatedAt || 0) < ONLINE_TIMEOUT_MS;
     return online && p.country === state.country;
   });
 
@@ -1126,6 +1132,11 @@ async function boot() {
   await initBackend();
   backend.subscribe(onPlayersUpdate);
   setInterval(() => { if (state.nameKey) pushMyDoc(true); }, HEARTBEAT_MS);
+  // Background tabs can throttle the interval above; catch up the instant
+  // the tab is looked at again so you don't sit "stale" longer than needed.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.nameKey) pushMyDoc(true);
+  });
   showScreen('login');
 }
 
