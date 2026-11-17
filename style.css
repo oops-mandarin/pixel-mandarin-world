@@ -136,13 +136,20 @@ select{ cursor:pointer; }
   overflow: hidden;
   flex-shrink: 0;
 }
-.world-map-svg{
+.world-map-svg-host{
+  position: absolute; inset: 0;
+  background: #173a5e;
+}
+.world-map-svg-host svg{
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   display: block;
 }
-.wm-ocean{ fill: #173a5e; }
-.wm-land{ fill: #2f6b4a; stroke: #1f4a33; stroke-width: 3; }
+.world-map-svg-host .wm-loading{
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; opacity: .7;
+}
 
 .country-markers{ position: absolute; inset: 0; }
 .country-marker{

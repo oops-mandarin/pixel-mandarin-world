@@ -457,7 +457,82 @@ document.getElementById('editLookBtnScene').addEventListener('click', () => {
 // ---------------- WORLD MAP ----------------
 
 const countryMarkers = document.getElementById('countryMarkers');
+const worldMapSvgHost = document.getElementById('worldMapSvgHost');
 const markerEls = new Map(); // country id -> {el, countEl}
+
+// A varied, pleasant palette so the whole world reads as colorful (like a
+// real illustrated atlas) rather than flat continents. Picked once per
+// country, deterministically, so the map looks the same every load.
+const WORLD_PALETTE = [
+  '#e07a5f', '#81b29a', '#f2cc8f', '#3d5a80', '#98c1d9',
+  '#e56b6f', '#6d9f71', '#f4a261', '#9d8df1', '#588157',
+  '#e9c46a', '#5fa8d3', '#bc6c25', '#a3cef1', '#d4a373',
+  '#76c893', '#ee9b00', '#7b9e89',
+];
+
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+// Fetches the (large, detailed) world SVG, colors every country, and uses
+// each of our 7 playable countries' real drawn shape to place its marker
+// in the right spot. Falls back to the plain ocean background + the
+// hand-guessed mapX/mapY above if the fetch fails for any reason.
+async function loadWorldMap() {
+  let svgText;
+  try {
+    const res = await fetch('assets/world-states.svg');
+    if (!res.ok) throw new Error('bad status ' + res.status);
+    svgText = await res.text();
+  } catch (err) {
+    console.warn('[Mandarin World] could not load world map art, using plain background', err);
+    return;
+  }
+
+  worldMapSvgHost.innerHTML = svgText;
+  const svg = worldMapSvgHost.querySelector('svg');
+  if (!svg) return;
+  svg.removeAttribute('width');
+  svg.removeAttribute('height');
+
+  const worldRect = svg.querySelector('#World');
+  if (worldRect) worldRect.setAttribute('fill', 'none');
+  const ocean = svg.querySelector('#Ocean');
+  if (ocean) { ocean.setAttribute('fill', '#173a5e'); ocean.setAttribute('stroke', 'none'); }
+  const antarctica = svg.querySelector('g#AQ');
+  if (antarctica) antarctica.setAttribute('display', 'none');
+
+  const playableIds = new Set(COUNTRIES.map((c) => c.id.toUpperCase()));
+  svg.querySelectorAll('g[id]').forEach((g) => {
+    if (!/^[A-Z]{2}$/.test(g.id)) return;
+    const playable = playableIds.has(g.id);
+    const color = WORLD_PALETTE[hashStr(g.id) % WORLD_PALETTE.length];
+    g.querySelectorAll('path').forEach((p) => {
+      p.setAttribute('fill', color);
+      p.setAttribute('stroke', playable ? '#ffd166' : '#12233a');
+      p.setAttribute('stroke-width', playable ? '1.6' : '0.6');
+    });
+  });
+
+  const vb = svg.viewBox.baseVal;
+  if (vb && vb.width && vb.height) {
+    COUNTRIES.forEach((c) => {
+      const g = svg.querySelector('g#' + c.id.toUpperCase());
+      if (!g) return;
+      try {
+        const box = g.getBBox();
+        if (box.width && box.height) {
+          c.mapX = ((box.x + box.width / 2) / vb.width) * 100;
+          c.mapY = ((box.y + box.height / 2) / vb.height) * 100;
+        }
+      } catch (err) { /* getBBox can throw on a detached/empty group — keep fallback */ }
+    });
+  }
+
+  if (state.screen === 'worldmap') renderWorldMap();
+}
 
 function onlinePlayers() {
   const now = Date.now();
@@ -468,8 +543,6 @@ function ensureMarkerEl(c) {
   if (markerEls.has(c.id)) return markerEls.get(c.id);
   const el = document.createElement('div');
   el.className = 'country-marker';
-  el.style.left = `${c.mapX}%`;
-  el.style.top = `${c.mapY}%`;
   el.innerHTML = `
     <span class="marker-flag">${c.flag}</span>
     <span class="marker-label">${c.nameEn}</span>
@@ -488,6 +561,8 @@ function renderWorldMap() {
 
   COUNTRIES.forEach((c) => {
     const rec = ensureMarkerEl(c);
+    rec.el.style.left = `${c.mapX}%`;
+    rec.el.style.top = `${c.mapY}%`;
     const n = counts[c.id] || 0;
     rec.countEl.textContent = n;
     rec.el.classList.toggle('has-people', n > 0);
@@ -772,6 +847,7 @@ function onPlayersUpdate(all) {
 }
 
 async function boot() {
+  loadWorldMap(); // runs in the background; login takes longer than this fetch
   await initBackend();
   backend.subscribe(onPlayersUpdate);
   setInterval(() => { if (state.nameKey) pushMyDoc(true); }, HEARTBEAT_MS);
