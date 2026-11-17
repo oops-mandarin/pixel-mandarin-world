@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mandarin World</title>
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
@@ -87,15 +87,17 @@
     <div class="me-tag" id="meTagScene"></div>
     <div class="scene-title" id="sceneTitle"></div>
     <div class="topbar-right">
-      <button id="editLookBtnScene" class="btn btn-small">✏️ Appearance</button>
-      <button id="myHomeBtnScene" class="btn btn-small">🏡 My Home</button>
-      <button id="zoomOutBtn" class="btn btn-small">🔎 World Map</button>
+      <button id="dayNightBtn" class="btn btn-small"><span class="bicon">🌙</span><span class="blabel"> Night</span></button>
+      <button id="editLookBtnScene" class="btn btn-small"><span class="bicon">✏️</span><span class="blabel"> Appearance</span></button>
+      <button id="myHomeBtnScene" class="btn btn-small"><span class="bicon">🏡</span><span class="blabel"> My Home</span></button>
+      <button id="zoomOutBtn" class="btn btn-small"><span class="bicon">🔎</span><span class="blabel"> World Map</span></button>
     </div>
   </div>
   <div id="sceneStage" class="scene-stage">
-    <div id="sceneZones"></div>
+    <div id="sceneTiles" class="hex-layer"></div>
     <div id="sceneHomePlots"></div>
     <div id="sceneAvatars"></div>
+    <div class="night-overlay"></div>
   </div>
   <div class="chatbar">
     <input id="chatInput" maxlength="80" placeholder="Say something everyone can see…">
@@ -113,8 +115,7 @@
     </div>
   </div>
   <div id="decorateStage" class="scene-stage decorate-stage">
-    <div id="decorateLotRing" class="decorate-lot-ring"></div>
-    <div id="decorateOtherHomes"></div>
+    <div id="decorateTile" class="hex-tile hex-tile-big"></div>
     <div id="decorateMyHome"></div>
   </div>
   <p class="decorate-hint" id="decorateHint"></p>
@@ -127,6 +128,6 @@
   <div id="onlineList" class="online-list"></div>
 </div>
 
-<script type="module" src="app.js?v=5"></script>
+<script type="module" src="app.js?v=6"></script>
 </body>
 </html>
