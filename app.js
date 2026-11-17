@@ -52,6 +52,23 @@ const DEFAULT_LOOK = {
   outfitColor: OUTFIT_COLORS[0],
 };
 
+// Buildings players can place around their own home to decorate their
+// home-country scene for everyone who visits it.
+const BUILDING_TYPES = [
+  { id: 'cafe', icon: '☕', label: 'Cafe' },
+  { id: 'store', icon: '🏪', label: 'Convenience Store' },
+  { id: 'restaurant', icon: '🥡', label: 'Chinese Restaurant' },
+  { id: 'gas', icon: '⛽', label: 'Gas Station' },
+  { id: 'car', icon: '🚗', label: 'Car' },
+  { id: 'soccer', icon: '⚽', label: 'Soccer Field' },
+  { id: 'baseball', icon: '⚾', label: 'Baseball Field' },
+  { id: 'park', icon: '🌳', label: 'Park' },
+  { id: 'market', icon: '🛒', label: 'Supermarket' },
+];
+const HOUSE_ICON = '🏠';
+const LOT_RADIUS = 0.18; // how far from the house a decoration may be placed
+const MAX_DECORATIONS = 10;
+
 const ONLINE_TIMEOUT_MS = 45000;
 const HEARTBEAT_MS = 15000;
 const MOVE_SPEED = 160; // px per second
@@ -242,6 +259,13 @@ const state = {
   customizerReturnTo: 'worldmap',
   sessionId: null,
   kicked: false,
+  // Home decoration: the player's own fixed territory in their home country.
+  homeCountry: null,
+  homeX: null, homeY: null, // fraction position in that country's scene
+  decorations: [], // [{type, dx, dy}] offsets from homeX/homeY
+  decorateReturnTo: 'worldmap',
+  decorateSelected: null, // a BUILDING_TYPES id armed to place next click
+  decorateMovingHouse: false,
 };
 
 function nameToKey(name) {
@@ -263,6 +287,10 @@ function myDoc() {
     message: state.message,
     messageAt: state.messageAt,
     sessionId: state.sessionId,
+    homeCountry: state.homeCountry,
+    homeX: state.homeX,
+    homeY: state.homeY,
+    decorations: state.decorations,
     updatedAt: Date.now(),
   };
 }
@@ -302,6 +330,7 @@ const screens = {
   customizer: document.getElementById('screen-customizer'),
   worldmap: document.getElementById('screen-worldmap'),
   scene: document.getElementById('screen-scene'),
+  decorate: document.getElementById('screen-decorate'),
 };
 const onlinePanel = document.getElementById('onlinePanel');
 
@@ -348,6 +377,10 @@ async function onEnter() {
     state.country = existing.country || COUNTRIES[0].id;
     state.x = existing.x ?? 0.5;
     state.y = existing.y ?? 0.5;
+    state.homeCountry = existing.homeCountry || existing.country || COUNTRIES[0].id;
+    state.homeX = existing.homeX ?? null;
+    state.homeY = existing.homeY ?? null;
+    state.decorations = existing.decorations || [];
     persistLocalMemory();
     await pushMyDoc(true);
     enterWorld();
@@ -355,6 +388,9 @@ async function onEnter() {
     state.isFirstTimeSetup = true;
     state.look = { ...DEFAULT_LOOK };
     state.x = 0.5; state.y = 0.5;
+    state.homeCountry = null;
+    state.homeX = null; state.homeY = null;
+    state.decorations = [];
     openCustomizer();
   }
 }
@@ -438,6 +474,7 @@ saveLookBtn.addEventListener('click', async () => {
   if (state.isFirstTimeSetup) {
     state.x = spawnX(); state.y = spawnY();
     state.isFirstTimeSetup = false;
+    state.homeCountry = state.country;
   }
   persistLocalMemory();
   await pushMyDoc(true);
@@ -593,6 +630,7 @@ document.getElementById('zoomOutBtn').addEventListener('click', () => {
 
 const sceneStage = document.getElementById('sceneStage');
 const sceneZonesEl = document.getElementById('sceneZones');
+const sceneHomePlotsEl = document.getElementById('sceneHomePlots');
 const sceneAvatarsEl = document.getElementById('sceneAvatars');
 const sceneTitle = document.getElementById('sceneTitle');
 const chatInput = document.getElementById('chatInput');
@@ -614,6 +652,48 @@ function renderZones() {
     el.style.top = `${z.py * rect.height}px`;
     el.innerHTML = `<span class="zicon">${z.icon}</span><span class="zlabel">${z.label}</span>`;
     sceneZonesEl.appendChild(el);
+  });
+}
+
+// Renders every player's decorated home-plot that belongs in this scene's
+// country — regardless of whether that player is currently online here.
+// A plot is the player's permanent territory, not tied to their presence.
+function renderHomePlots() {
+  const rect = sceneStage.getBoundingClientRect();
+  sceneHomePlotsEl.innerHTML = '';
+  Object.values(state.players).forEach((p) => {
+    if (p.homeCountry !== state.country || p.homeX == null || p.homeY == null) return;
+
+    const plot = document.createElement('div');
+    plot.className = 'home-plot';
+    const hx = p.homeX * rect.width, hy = p.homeY * rect.height;
+
+    const house = document.createElement('div');
+    house.className = 'house';
+    house.style.left = `${hx}px`;
+    house.style.top = `${hy}px`;
+    house.textContent = HOUSE_ICON;
+    plot.appendChild(house);
+
+    const label = document.createElement('div');
+    label.className = 'house-label';
+    label.style.left = `${hx}px`;
+    label.style.top = `${hy}px`;
+    label.textContent = p.nameKey === state.nameKey ? 'Your home' : `${p.name}'s home`;
+    plot.appendChild(label);
+
+    (p.decorations || []).forEach((d) => {
+      const bt = BUILDING_TYPES.find((b) => b.id === d.type);
+      if (!bt) return;
+      const el = document.createElement('div');
+      el.className = 'deco';
+      el.style.left = `${(p.homeX + d.dx) * rect.width}px`;
+      el.style.top = `${(p.homeY + d.dy) * rect.height}px`;
+      el.textContent = bt.icon;
+      plot.appendChild(el);
+    });
+
+    sceneHomePlotsEl.appendChild(plot);
   });
 }
 
@@ -698,6 +778,7 @@ function enterScene() {
   avatarEls.clear();
   requestAnimationFrame(() => {
     renderZones();
+    renderHomePlots();
     renderSceneAvatars();
   });
 }
@@ -784,6 +865,199 @@ async function sendChat() {
   renderSceneAvatars();
 }
 
+// ---------------- DECORATE MY HOME ----------------
+
+const decorateStage = document.getElementById('decorateStage');
+const decorateLotRing = document.getElementById('decorateLotRing');
+const decorateOtherHomesEl = document.getElementById('decorateOtherHomes');
+const decorateMyHomeEl = document.getElementById('decorateMyHome');
+const decorateTitle = document.getElementById('decorateTitle');
+const decorateHint = document.getElementById('decorateHint');
+const decoratePaletteEl = document.getElementById('decoratePalette');
+
+function homeCountryObj() {
+  return COUNTRIES.find((c) => c.id === state.homeCountry) || currentCountry();
+}
+
+function openDecorate(returnTo) {
+  state.decorateReturnTo = returnTo;
+  state.decorateSelected = null;
+  state.decorateMovingHouse = false;
+  if (!state.homeCountry) state.homeCountry = state.country;
+  document.getElementById('meTagDecorate').textContent = `👤 ${state.name}`;
+  buildDecoratePalette();
+  showScreen('decorate');
+  requestAnimationFrame(renderDecorateScreen);
+}
+
+function buildDecoratePalette() {
+  decoratePaletteEl.innerHTML = '';
+
+  const noneBtn = document.createElement('div');
+  noneBtn.className = 'palette-item';
+  noneBtn.innerHTML = `<span class="picon">🖐️</span><span class="plabel">None</span>`;
+  noneBtn.addEventListener('click', () => {
+    state.decorateSelected = null;
+    renderDecorateScreen();
+  });
+  decoratePaletteEl.appendChild(noneBtn);
+
+  BUILDING_TYPES.forEach((b) => {
+    const el = document.createElement('div');
+    el.className = 'palette-item';
+    el.dataset.id = b.id;
+    el.innerHTML = `<span class="picon">${b.icon}</span><span class="plabel">${b.label}</span>`;
+    el.addEventListener('click', () => {
+      state.decorateSelected = state.decorateSelected === b.id ? null : b.id;
+      renderDecorateScreen();
+    });
+    decoratePaletteEl.appendChild(el);
+  });
+}
+
+function renderDecorateScreen() {
+  const c = homeCountryObj();
+  decorateTitle.textContent = `🏡 Decorate — ${c.flag} ${c.nameEn}`;
+  const rect = decorateStage.getBoundingClientRect();
+
+  // palette selection highlight
+  [...decoratePaletteEl.children].forEach((el) => {
+    const isNone = !el.dataset.id;
+    el.classList.toggle('selected', isNone ? !state.decorateSelected && !state.decorateMovingHouse : el.dataset.id === state.decorateSelected);
+  });
+
+  // hint text
+  if (state.homeX == null) {
+    decorateHint.textContent = `Click anywhere to place your house ${HOUSE_ICON}`;
+  } else if (state.decorateMovingHouse) {
+    decorateHint.textContent = 'Click a new spot to move your house (your decorations move with it)';
+  } else if (state.decorateSelected) {
+    const bt = BUILDING_TYPES.find((b) => b.id === state.decorateSelected);
+    decorateHint.textContent = `Click near your house to place a ${bt.label} (${state.decorations.length}/${MAX_DECORATIONS})`;
+  } else {
+    decorateHint.textContent = `Click your house ${HOUSE_ICON} to move it, or pick something below to place`;
+  }
+
+  // other players' homes in this country, shown dim for context
+  decorateOtherHomesEl.innerHTML = '';
+  Object.values(state.players).forEach((p) => {
+    if (p.nameKey === state.nameKey) return;
+    if (p.homeCountry !== state.homeCountry || p.homeX == null || p.homeY == null) return;
+    const house = document.createElement('div');
+    house.className = 'house';
+    house.style.left = `${p.homeX * rect.width}px`;
+    house.style.top = `${p.homeY * rect.height}px`;
+    house.textContent = HOUSE_ICON;
+    decorateOtherHomesEl.appendChild(house);
+    (p.decorations || []).forEach((d) => {
+      const bt = BUILDING_TYPES.find((b) => b.id === d.type);
+      if (!bt) return;
+      const el = document.createElement('div');
+      el.className = 'deco';
+      el.style.left = `${(p.homeX + d.dx) * rect.width}px`;
+      el.style.top = `${(p.homeY + d.dy) * rect.height}px`;
+      el.textContent = bt.icon;
+      decorateOtherHomesEl.appendChild(el);
+    });
+  });
+
+  // my own home + decorations
+  decorateMyHomeEl.innerHTML = '';
+  if (state.homeX != null && state.homeY != null) {
+    const hx = state.homeX * rect.width, hy = state.homeY * rect.height;
+
+    decorateLotRing.style.display = '';
+    const ringPx = LOT_RADIUS * Math.min(rect.width, rect.height);
+    decorateLotRing.style.width = `${ringPx * 2}px`;
+    decorateLotRing.style.height = `${ringPx * 2}px`;
+    decorateLotRing.style.left = `${hx}px`;
+    decorateLotRing.style.top = `${hy}px`;
+
+    const house = document.createElement('div');
+    house.className = 'house';
+    house.style.left = `${hx}px`;
+    house.style.top = `${hy}px`;
+    house.textContent = HOUSE_ICON;
+    house.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.decorateSelected = null;
+      state.decorateMovingHouse = !state.decorateMovingHouse;
+      renderDecorateScreen();
+    });
+    decorateMyHomeEl.appendChild(house);
+
+    const label = document.createElement('div');
+    label.className = 'house-label';
+    label.style.left = `${hx}px`;
+    label.style.top = `${hy}px`;
+    label.textContent = 'Your home';
+    decorateMyHomeEl.appendChild(label);
+
+    state.decorations.forEach((d, i) => {
+      const bt = BUILDING_TYPES.find((b) => b.id === d.type);
+      if (!bt) return;
+      const el = document.createElement('div');
+      el.className = 'deco';
+      el.style.left = `${(state.homeX + d.dx) * rect.width}px`;
+      el.style.top = `${(state.homeY + d.dy) * rect.height}px`;
+      el.style.cursor = 'pointer';
+      el.textContent = bt.icon;
+      el.title = 'Click to remove';
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.decorations.splice(i, 1);
+        pushMyDoc(true);
+        renderDecorateScreen();
+      });
+      decorateMyHomeEl.appendChild(el);
+    });
+  } else {
+    decorateLotRing.style.display = 'none';
+  }
+}
+
+decorateStage.addEventListener('click', async (e) => {
+  const rect = decorateStage.getBoundingClientRect();
+  const xFrac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  const yFrac = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+
+  if (state.homeX == null || state.homeY == null) {
+    state.homeX = xFrac; state.homeY = yFrac;
+    await pushMyDoc(true);
+    renderDecorateScreen();
+    return;
+  }
+
+  if (state.decorateMovingHouse) {
+    state.homeX = xFrac; state.homeY = yFrac;
+    state.decorateMovingHouse = false;
+    await pushMyDoc(true);
+    renderDecorateScreen();
+    return;
+  }
+
+  if (state.decorateSelected) {
+    if (state.decorations.length >= MAX_DECORATIONS) {
+      decorateHint.textContent = `You've placed the max of ${MAX_DECORATIONS} — remove one to add another.`;
+      return;
+    }
+    let dx = xFrac - state.homeX, dy = yFrac - state.homeY;
+    const dist = Math.hypot(dx, dy);
+    if (dist > LOT_RADIUS) { dx = (dx / dist) * LOT_RADIUS; dy = (dy / dist) * LOT_RADIUS; }
+    state.decorations.push({ type: state.decorateSelected, dx, dy });
+    await pushMyDoc(true);
+    renderDecorateScreen();
+  }
+});
+
+document.getElementById('decorateBackBtn').addEventListener('click', () => {
+  if (state.decorateReturnTo === 'scene') enterScene();
+  else enterWorld();
+});
+
+document.getElementById('myHomeBtnWorld').addEventListener('click', () => openDecorate('worldmap'));
+document.getElementById('myHomeBtnScene').addEventListener('click', () => openDecorate('scene'));
+
 // ---------------- ONLINE PANEL ----------------
 
 const onlineListEl = document.getElementById('onlineList');
@@ -842,7 +1116,8 @@ function onPlayersUpdate(all) {
   }
 
   if (state.screen === 'worldmap') renderWorldMap();
-  if (state.screen === 'scene') renderSceneAvatars();
+  if (state.screen === 'scene') { renderHomePlots(); renderSceneAvatars(); }
+  if (state.screen === 'decorate') renderDecorateScreen();
   renderOnlinePanel();
 }
 

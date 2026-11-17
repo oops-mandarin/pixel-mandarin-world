@@ -69,7 +69,10 @@
 <div id="screen-worldmap" class="screen" style="display:none">
   <div class="topbar">
     <div class="me-tag" id="meTagWorld"></div>
-    <button id="editLookBtnWorld" class="btn btn-small">✏️ Appearance</button>
+    <div class="topbar-right">
+      <button id="editLookBtnWorld" class="btn btn-small">✏️ Appearance</button>
+      <button id="myHomeBtnWorld" class="btn btn-small">🏡 My Home</button>
+    </div>
   </div>
   <h2 class="worldmap-title">🌍 World Map — click a country to zoom in</h2>
   <div class="world-map-stage">
@@ -85,17 +88,37 @@
     <div class="scene-title" id="sceneTitle"></div>
     <div class="topbar-right">
       <button id="editLookBtnScene" class="btn btn-small">✏️ Appearance</button>
+      <button id="myHomeBtnScene" class="btn btn-small">🏡 My Home</button>
       <button id="zoomOutBtn" class="btn btn-small">🔎 World Map</button>
     </div>
   </div>
   <div id="sceneStage" class="scene-stage">
     <div id="sceneZones"></div>
+    <div id="sceneHomePlots"></div>
     <div id="sceneAvatars"></div>
   </div>
   <div class="chatbar">
     <input id="chatInput" maxlength="80" placeholder="Say something everyone can see…">
     <button id="chatSendBtn" class="btn btn-small">Send</button>
   </div>
+</div>
+
+<!-- ===================== DECORATE-MY-HOME SCREEN ===================== -->
+<div id="screen-decorate" class="screen" style="display:none">
+  <div class="topbar">
+    <div class="me-tag" id="meTagDecorate"></div>
+    <div class="scene-title" id="decorateTitle"></div>
+    <div class="topbar-right">
+      <button id="decorateBackBtn" class="btn btn-small">✅ Done</button>
+    </div>
+  </div>
+  <div id="decorateStage" class="scene-stage decorate-stage">
+    <div id="decorateLotRing" class="decorate-lot-ring"></div>
+    <div id="decorateOtherHomes"></div>
+    <div id="decorateMyHome"></div>
+  </div>
+  <p class="decorate-hint" id="decorateHint"></p>
+  <div id="decoratePalette" class="decorate-palette"></div>
 </div>
 
 <!-- ===================== ONLINE PANEL (always visible once logged in) ===================== -->

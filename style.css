@@ -118,9 +118,19 @@ select{ cursor:pointer; }
   font-size: 9px;
   gap: 8px;
 }
-.topbar-right{ display:flex; gap:6px; }
-.me-tag{ color: var(--accent); white-space:nowrap; }
-.scene-title{ color: var(--text); opacity:.85; flex:1; text-align:center; }
+.topbar-right{ display:flex; gap:6px; flex-shrink:0; }
+.me-tag{ color: var(--accent); white-space:nowrap; flex-shrink:0; }
+.scene-title{
+  color: var(--text); opacity:.85; flex:1; text-align:center;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+@media (max-width: 640px){
+  .me-tag{ max-width: 70px; overflow:hidden; text-overflow:ellipsis; }
+  .topbar{ padding: 0 6px; gap: 4px; }
+  .topbar-right{ gap: 4px; }
+  .topbar-right .btn-small{ padding: 7px 6px; font-size: 7px; }
+}
 
 /* ---------- World map ---------- */
 #screen-worldmap{ padding-top: 60px; justify-content: flex-start; overflow-y: auto; }
@@ -273,6 +283,31 @@ select{ cursor:pointer; }
   margin-top: 1px;
 }
 
+/* ---------- Home plots (player-decorated areas inside a scene) ---------- */
+#sceneHomePlots{ position:absolute; inset:0; pointer-events:none; }
+.home-plot{ position:absolute; }
+.house{
+  position:absolute;
+  transform: translate(-50%,-100%);
+  font-size: 30px;
+  filter: drop-shadow(2px 2px 0 rgba(0,0,0,.4));
+}
+.house-label{
+  position:absolute;
+  transform: translate(-50%, 2px);
+  font-size: 6px;
+  background: rgba(13,15,34,.75);
+  padding: 2px 5px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.deco{
+  position:absolute;
+  transform: translate(-50%,-80%);
+  font-size: 22px;
+  filter: drop-shadow(1px 1px 0 rgba(0,0,0,.4));
+}
+
 .chatbar{
   position:fixed; left:0; right:0; bottom:0; height:56px;
   background: var(--panel);
@@ -320,4 +355,52 @@ select{ cursor:pointer; }
 @media (max-width: 640px){
   .customizer-body{ flex-direction: column; align-items:center; }
   .online-panel{ width: 140px; }
+}
+
+/* ---------- Decorate my home ---------- */
+#screen-decorate{ padding:0; align-items: stretch; justify-content: flex-start; }
+.decorate-stage{ bottom: 100px; cursor: pointer; }
+.decorate-lot-ring{
+  position: absolute;
+  border: 2px dashed rgba(255,209,102,.6);
+  border-radius: 50%;
+  transform: translate(-50%,-50%);
+  pointer-events: none;
+  display: none;
+}
+#decorateOtherHomes{ position:absolute; inset:0; opacity:.45; pointer-events:none; }
+#decorateMyHome{ position:absolute; inset:0; }
+#decorateMyHome .house{ cursor: grab; }
+.decorate-hint{
+  text-align:center;
+  font-size: 9px;
+  padding: 8px 12px 0;
+  min-height: 14px;
+  color: var(--accent);
+}
+.decorate-palette{
+  position: fixed; left:0; right:0; bottom:0;
+  background: var(--panel);
+  border-top: 3px solid var(--border);
+  display:flex; gap:8px; flex-wrap:wrap;
+  padding: 8px 10px;
+  z-index: 50;
+  justify-content:center;
+}
+.palette-item{
+  display:flex; flex-direction:column; align-items:center;
+  gap: 3px;
+  padding: 6px 8px;
+  border: 2px solid var(--panel-light);
+  border-radius: 3px;
+  cursor: pointer;
+  background: var(--border);
+}
+.palette-item .picon{ font-size: 20px; }
+.palette-item .plabel{ font-size: 6px; text-align:center; max-width: 54px; }
+.palette-item.selected{ border-color: var(--accent); background: var(--panel-light); }
+.palette-item.remove-mode{ border-color: var(--danger); }
+
+@media (max-width: 640px){
+  .palette-item .plabel{ display:none; }
 }
