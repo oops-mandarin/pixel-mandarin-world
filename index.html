@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mandarin World</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===================== LOGIN SCREEN ===================== -->
+<div id="screen-login" class="screen">
+  <div class="panel login-panel">
+    <h1>🀄 Mandarin World</h1>
+    <p class="sub">Type a name and come on in!</p>
+    <input id="nameInput" maxlength="12" placeholder="Your name / nickname" autocomplete="off">
+    <button id="enterBtn" class="btn btn-primary">Enter</button>
+    <p class="hint" id="loginHint"></p>
+  </div>
+</div>
+
+<!-- ===================== CUSTOMIZER SCREEN ===================== -->
+<div id="screen-customizer" class="screen" style="display:none">
+  <div class="panel customizer-panel">
+    <h2>Customize your character</h2>
+    <div class="customizer-body">
+      <div class="preview-box">
+        <canvas id="previewCanvas" width="32" height="40"></canvas>
+      </div>
+      <div class="options">
+
+        <div class="opt-row">
+          <span class="opt-label">Skin</span>
+          <div id="skinSwatches" class="swatches"></div>
+        </div>
+
+        <div class="opt-row">
+          <span class="opt-label">Hair style</span>
+          <div id="hairStyleSwatches" class="swatches shapes"></div>
+        </div>
+
+        <div class="opt-row">
+          <span class="opt-label">Hair color</span>
+          <div id="hairColorSwatches" class="swatches"></div>
+        </div>
+
+        <div class="opt-row">
+          <span class="opt-label">Outfit style</span>
+          <div id="outfitStyleSwatches" class="swatches shapes"></div>
+        </div>
+
+        <div class="opt-row">
+          <span class="opt-label">Outfit color</span>
+          <div id="outfitColorSwatches" class="swatches"></div>
+        </div>
+
+        <div class="opt-row">
+          <span class="opt-label">Which country do you live in?</span>
+          <select id="homeCountrySelect"></select>
+        </div>
+
+      </div>
+    </div>
+    <button id="saveLookBtn" class="btn btn-primary">Let's go!</button>
+  </div>
+</div>
+
+<!-- ===================== WORLD MAP SCREEN ===================== -->
+<div id="screen-worldmap" class="screen" style="display:none">
+  <div class="topbar">
+    <div class="me-tag" id="meTagWorld"></div>
+    <button id="editLookBtnWorld" class="btn btn-small">✏️ Appearance</button>
+  </div>
+  <h2 class="worldmap-title">🌍 World Map — click a country to zoom in</h2>
+  <div id="countryGrid" class="country-grid"></div>
+</div>
+
+<!-- ===================== COUNTRY SCENE SCREEN ===================== -->
+<div id="screen-scene" class="screen" style="display:none">
+  <div class="topbar">
+    <div class="me-tag" id="meTagScene"></div>
+    <div class="scene-title" id="sceneTitle"></div>
+    <div class="topbar-right">
+      <button id="editLookBtnScene" class="btn btn-small">✏️ Appearance</button>
+      <button id="zoomOutBtn" class="btn btn-small">🔎 World Map</button>
+    </div>
+  </div>
+  <div id="sceneStage" class="scene-stage">
+    <div id="sceneZones"></div>
+    <div id="sceneAvatars"></div>
+  </div>
+  <div class="chatbar">
+    <input id="chatInput" maxlength="80" placeholder="Say something everyone can see…">
+    <button id="chatSendBtn" class="btn btn-small">Send</button>
+  </div>
+</div>
+
+<!-- ===================== ONLINE PANEL (always visible once logged in) ===================== -->
+<div id="onlinePanel" class="online-panel" style="display:none">
+  <div class="online-panel-header" id="onlinePanelHeader">🟢 Online (<span id="onlineCount">0</span>)</div>
+  <div id="onlineList" class="online-list"></div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
