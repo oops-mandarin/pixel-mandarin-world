@@ -1,0 +1,16 @@
+rules_version = '2';
+
+// Open read/write on the "players" collection only — no login is required
+// by design (students just type a name), so there is no way to check who
+// "owns" a name. Fine for a small trusted Discord group; anyone with the
+// site link could in principle overwrite another player's row.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /players/{playerId} {
+      allow read, write: if true;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
