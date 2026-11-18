@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mandarin World</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
@@ -14,6 +14,11 @@
     <h1>🀄 Mandarin World</h1>
     <p class="sub">Type a name and come on in!</p>
     <input id="nameInput" maxlength="12" placeholder="Your name / nickname" autocomplete="off">
+    <div class="opt-row">
+      <span class="opt-label">Where do you live now?</span>
+      <select id="loginCountrySelect"></select>
+      <input id="loginCountryCustom" maxlength="30" placeholder="Type your country" style="display:none">
+    </div>
     <button id="enterBtn" class="btn btn-primary">Enter</button>
     <p class="hint" id="loginHint"></p>
   </div>
@@ -52,11 +57,6 @@
         <div class="opt-row">
           <span class="opt-label">Outfit color</span>
           <div id="outfitColorSwatches" class="swatches"></div>
-        </div>
-
-        <div class="opt-row">
-          <span class="opt-label">Which country do you live in?</span>
-          <select id="homeCountrySelect"></select>
         </div>
 
       </div>
@@ -128,6 +128,6 @@
   <div id="onlineList" class="online-list"></div>
 </div>
 
-<script type="module" src="app.js?v=6"></script>
+<script type="module" src="app.js?v=7"></script>
 </body>
 </html>

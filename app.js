@@ -4,17 +4,94 @@ import { firebaseConfig } from './firebase-config.js';
 // DATA
 // ============================================================
 
-// mapX/mapY are percentage positions (0-100) on the world map stage,
-// loosely matching each country's real-world location.
-const COUNTRIES = [
-  { id: 'tw', flag: '🇹🇼', nameEn: 'Taiwan', mapX: 86, mapY: 32 },
-  { id: 'nz', flag: '🇳🇿', nameEn: 'New Zealand', mapX: 93, mapY: 82 },
-  { id: 'us', flag: '🇺🇸', nameEn: 'USA', mapX: 20, mapY: 32 },
-  { id: 'id', flag: '🇮🇩', nameEn: 'Indonesia', mapX: 73, mapY: 70 },
-  { id: 'my', flag: '🇲🇾', nameEn: 'Malaysia', mapX: 65, mapY: 58 },
-  { id: 'ph', flag: '🇵🇭', nameEn: 'Philippines', mapX: 78, mapY: 46 },
-  { id: 'fr', flag: '🇫🇷', nameEn: 'France', mapX: 51, mapY: 20 },
-];
+// Any real country can become a home island: the world SVG map already
+// draws every country as a <g id="XX"> using its ISO alpha-2 code, so once
+// we know someone's code we can find their real shape and place a marker on
+// it. CODE_NAMES gives a clean display name for the ones a Discord learner
+// is likely to type; COUNTRY_ALIASES maps common spellings/nicknames to a
+// code so "USA"/"America"/"United States" all land on the same island.
+const CODE_NAMES = {
+  tw: 'Taiwan', us: 'USA', nz: 'New Zealand', ph: 'Philippines', id: 'Indonesia', my: 'Malaysia', fr: 'France',
+  gb: 'UK', ca: 'Canada', au: 'Australia', jp: 'Japan', kr: 'South Korea', kp: 'North Korea',
+  cn: 'China', hk: 'Hong Kong', mo: 'Macau', sg: 'Singapore', th: 'Thailand', vn: 'Vietnam',
+  mm: 'Myanmar', kh: 'Cambodia', la: 'Laos', bn: 'Brunei', in: 'India', pk: 'Pakistan',
+  bd: 'Bangladesh', lk: 'Sri Lanka', np: 'Nepal', de: 'Germany', es: 'Spain', it: 'Italy',
+  pt: 'Portugal', nl: 'Netherlands', be: 'Belgium', ch: 'Switzerland', at: 'Austria', ie: 'Ireland',
+  se: 'Sweden', no: 'Norway', dk: 'Denmark', fi: 'Finland', is: 'Iceland', pl: 'Poland',
+  cz: 'Czechia', sk: 'Slovakia', hu: 'Hungary', ro: 'Romania', bg: 'Bulgaria', gr: 'Greece',
+  tr: 'Turkey', ru: 'Russia', ua: 'Ukraine', mx: 'Mexico', br: 'Brazil', ar: 'Argentina',
+  cl: 'Chile', co: 'Colombia', pe: 'Peru', ve: 'Venezuela', ec: 'Ecuador', uy: 'Uruguay',
+  py: 'Paraguay', bo: 'Bolivia', cu: 'Cuba', jm: 'Jamaica', do: 'Dominican Republic', eg: 'Egypt',
+  za: 'South Africa', ng: 'Nigeria', ke: 'Kenya', ma: 'Morocco', il: 'Israel', sa: 'Saudi Arabia',
+  ae: 'UAE', qa: 'Qatar', kw: 'Kuwait', jo: 'Jordan', lb: 'Lebanon', ir: 'Iran', iq: 'Iraq',
+  af: 'Afghanistan', kz: 'Kazakhstan', mn: 'Mongolia', pg: 'Papua New Guinea', fj: 'Fiji',
+  ws: 'Samoa', to: 'Tonga', pw: 'Palau', gu: 'Guam', lu: 'Luxembourg', mc: 'Monaco',
+  li: 'Liechtenstein', ad: 'Andorra', sm: 'San Marino', va: 'Vatican City', mt: 'Malta',
+  cy: 'Cyprus', hr: 'Croatia', si: 'Slovenia', rs: 'Serbia', ba: 'Bosnia & Herzegovina',
+  al: 'Albania', mk: 'North Macedonia', me: 'Montenegro', ee: 'Estonia', lv: 'Latvia',
+  lt: 'Lithuania', by: 'Belarus', md: 'Moldova', ge: 'Georgia', am: 'Armenia', az: 'Azerbaijan',
+};
+
+const COUNTRY_ALIASES = {};
+Object.entries(CODE_NAMES).forEach(([code, name]) => { COUNTRY_ALIASES[name.toLowerCase()] = code; });
+Object.assign(COUNTRY_ALIASES, {
+  'united states': 'us', 'usa': 'us', 'u.s.a.': 'us', 'u.s.': 'us', 'america': 'us', 'united states of america': 'us',
+  'uk': 'gb', 'u.k.': 'gb', 'britain': 'gb', 'great britain': 'gb', 'england': 'gb',
+  'scotland': 'gb', 'wales': 'gb', 'united kingdom': 'gb', 'northern ireland': 'gb',
+  'holland': 'nl', 'macao': 'mo', 'burma': 'mm', 'czech republic': 'cz', 'viet nam': 'vn',
+  'korea': 'kr', 'south korea': 'kr', 'republic of korea': 'kr', 'korea, south': 'kr',
+  'mainland china': 'cn', "people's republic of china": 'cn', 'republic of china': 'tw',
+  'uae': 'ae', 'emirates': 'ae', 'dubai': 'ae', 'united arab emirates': 'ae',
+  'vatican': 'va', 'holy see': 'va', 'macedonia': 'mk', 'bosnia': 'ba',
+  'russian federation': 'ru', 'turkiye': 'tr', 'aotearoa': 'nz', 'the philippines': 'ph',
+});
+
+function codeToFlag(code) {
+  return code.toUpperCase().replace(/./g, (ch) => String.fromCodePoint(127397 + ch.charCodeAt(0)));
+}
+
+// id -> {id, flag, nameEn, mapX, mapY}. mapX/mapY are percentage positions
+// (0-100) on the world map stage; refined with real shape positions once
+// the world SVG loads (see loadWorldMap/ensureCountryRegistered).
+const countryRegistry = new Map();
+
+function registerCountry(id, flag, nameEn, mapX, mapY) {
+  if (countryRegistry.has(id)) return countryRegistry.get(id);
+  const c = { id, flag, nameEn, mapX, mapY };
+  countryRegistry.set(id, c);
+  return c;
+}
+
+// The quick-pick buttons on the login screen; everyone starts knowing these.
+const PRESET_COUNTRY_IDS = ['tw', 'us', 'nz', 'ph', 'id', 'my', 'fr'];
+const PRESET_FALLBACK_POSITIONS = {
+  tw: [86, 32], us: [20, 32], nz: [93, 82], ph: [78, 46], id: [73, 70], my: [65, 58], fr: [51, 20],
+};
+PRESET_COUNTRY_IDS.forEach((id) => {
+  const [mapX, mapY] = PRESET_FALLBACK_POSITIONS[id];
+  registerCountry(id, codeToFlag(id), CODE_NAMES[id] || id.toUpperCase(), mapX, mapY);
+});
+// Shared catch-all island for anyone whose typed country we can't place for
+// real (a typo, or somewhere not in our name list yet).
+registerCountry('other', '🌍', 'Other / Elsewhere', 50, 92);
+
+// Set once loadWorldMap() fetches and inlines the real-world SVG; needed by
+// normalizeCountryInput and ensureCountryRegistered to look up a country's
+// actual drawn shape.
+let worldSvgEl = null;
+
+// Turns whatever someone typed into a real ISO country code, or null if we
+// can't recognize it (caller falls back to the shared 'other' island).
+function normalizeCountryInput(text) {
+  const raw = (text || '').trim();
+  if (!raw) return null;
+  const key = raw.toLowerCase().replace(/\s+/g, ' ');
+  if (COUNTRY_ALIASES[key]) return COUNTRY_ALIASES[key];
+  if (/^[a-z]{2}$/i.test(raw) && worldSvgEl && worldSvgEl.querySelector('g#' + raw.toUpperCase())) {
+    return raw.toLowerCase();
+  }
+  return null;
+}
 
 const SKIN_COLORS = ['#ffdbac', '#f1c27d', '#c68642', '#8d5524'];
 const HAIR_COLORS = ['#2b2b2b', '#6b4226', '#d9b56b', '#b23a2a', '#e07bb0', '#4a7fd6'];
@@ -270,7 +347,7 @@ const state = {
   nameKey: null,
   name: null,
   look: { ...DEFAULT_LOOK },
-  country: COUNTRIES[0].id,
+  country: PRESET_COUNTRY_IDS[0],
   x: 0.5, y: 0.5, // fraction of stage size
   message: '', messageAt: 0,
   players: {}, // all players from backend, keyed by nameKey
@@ -370,14 +447,51 @@ function showScreen(name) {
 const nameInput = document.getElementById('nameInput');
 const enterBtn = document.getElementById('enterBtn');
 const loginHint = document.getElementById('loginHint');
+const loginCountrySelect = document.getElementById('loginCountrySelect');
+const loginCountryCustom = document.getElementById('loginCountryCustom');
+
+PRESET_COUNTRY_IDS.forEach((id) => {
+  const c = countryRegistry.get(id);
+  const opt = document.createElement('option');
+  opt.value = id;
+  opt.textContent = `${c.flag} ${c.nameEn}`;
+  loginCountrySelect.appendChild(opt);
+});
+const loginCustomOpt = document.createElement('option');
+loginCustomOpt.value = '__custom';
+loginCustomOpt.textContent = '🌍 Other — type it below';
+loginCountrySelect.appendChild(loginCustomOpt);
+
+loginCountrySelect.addEventListener('change', () => {
+  const isCustom = loginCountrySelect.value === '__custom';
+  loginCountryCustom.style.display = isCustom ? '' : 'none';
+  if (isCustom) loginCountryCustom.focus();
+});
 
 try {
   const last = localStorage.getItem('pmw_last_name');
   if (last) nameInput.value = last;
+  const lastCountry = localStorage.getItem('pmw_last_country');
+  if (lastCountry && PRESET_COUNTRY_IDS.includes(lastCountry)) loginCountrySelect.value = lastCountry;
 } catch (e) {}
 
 enterBtn.addEventListener('click', onEnter);
 nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') onEnter(); });
+
+// Resolves the login screen's country picker to a real code, registering a
+// brand-new one (and falling back to the shared "other" island for a typo
+// or an unrecognized place) so it's ready before we need it.
+function resolveLoginCountry() {
+  let id;
+  if (loginCountrySelect.value === '__custom') {
+    id = normalizeCountryInput(loginCountryCustom.value) || 'other';
+  } else {
+    id = loginCountrySelect.value;
+  }
+  ensureCountryRegistered(id);
+  try { localStorage.setItem('pmw_last_country', id); } catch (e) {}
+  return id;
+}
 
 async function onEnter() {
   const raw = nameInput.value;
@@ -396,10 +510,12 @@ async function onEnter() {
       skin: existing.skin, hairStyle: existing.hairStyle, hairColor: existing.hairColor,
       outfitStyle: existing.outfitStyle, outfitColor: existing.outfitColor,
     };
-    state.country = existing.country || COUNTRIES[0].id;
+    state.country = existing.country || PRESET_COUNTRY_IDS[0];
     state.x = existing.x ?? 0.5;
     state.y = existing.y ?? 0.5;
-    state.homeCountry = existing.homeCountry || existing.country || COUNTRIES[0].id;
+    state.homeCountry = existing.homeCountry || existing.country || PRESET_COUNTRY_IDS[0];
+    ensureCountryRegistered(state.country);
+    ensureCountryRegistered(state.homeCountry);
     // Players from before the island/tile system get a joinedAt now, which
     // puts them at the end of the spiral rather than disturbing anyone else.
     state.joinedAt = existing.joinedAt || Date.now();
@@ -411,6 +527,7 @@ async function onEnter() {
     state.isFirstTimeSetup = true;
     state.look = { ...DEFAULT_LOOK };
     state.x = 0.5; state.y = 0.5;
+    state.country = resolveLoginCountry();
     state.homeCountry = null;
     state.joinedAt = null;
     state.decorations = [];
@@ -460,7 +577,6 @@ const hairStyleSwatches = document.getElementById('hairStyleSwatches');
 const hairColorSwatches = document.getElementById('hairColorSwatches');
 const outfitStyleSwatches = document.getElementById('outfitStyleSwatches');
 const outfitColorSwatches = document.getElementById('outfitColorSwatches');
-const homeCountrySelect = document.getElementById('homeCountrySelect');
 const saveLookBtn = document.getElementById('saveLookBtn');
 
 buildSwatches(skinSwatches, SKIN_COLORS, 'skin');
@@ -469,20 +585,12 @@ buildSwatches(hairColorSwatches, HAIR_COLORS, 'hairColor');
 buildSwatches(outfitStyleSwatches, null, 'outfitStyle', { shape: true, labels: OUTFIT_STYLES });
 buildSwatches(outfitColorSwatches, OUTFIT_COLORS, 'outfitColor');
 
-COUNTRIES.forEach((c) => {
-  const opt = document.createElement('option');
-  opt.value = c.id;
-  opt.textContent = `${c.flag} ${c.nameEn}`;
-  homeCountrySelect.appendChild(opt);
-});
-
 function openCustomizer() {
   refreshSwatchSelection(skinSwatches, state.look.skin);
   refreshSwatchSelection(hairStyleSwatches, state.look.hairStyle);
   refreshSwatchSelection(hairColorSwatches, state.look.hairColor);
   refreshSwatchSelection(outfitStyleSwatches, state.look.outfitStyle);
   refreshSwatchSelection(outfitColorSwatches, state.look.outfitColor);
-  homeCountrySelect.value = state.country;
   redrawPreview();
   showScreen('customizer');
 }
@@ -493,7 +601,6 @@ function spawnX() { return 0.62 + (Math.random() - 0.5) * 0.24; }
 function spawnY() { return 0.45 + (Math.random() - 0.5) * 0.3; }
 
 saveLookBtn.addEventListener('click', async () => {
-  state.country = homeCountrySelect.value;
   if (state.isFirstTimeSetup) {
     state.x = spawnX(); state.y = spawnY();
     state.isFirstTimeSetup = false;
@@ -557,6 +664,7 @@ async function loadWorldMap() {
   if (!svg) return;
   svg.removeAttribute('width');
   svg.removeAttribute('height');
+  worldSvgEl = svg;
 
   const worldRect = svg.querySelector('#World');
   if (worldRect) worldRect.setAttribute('fill', 'none');
@@ -565,7 +673,10 @@ async function loadWorldMap() {
   const antarctica = svg.querySelector('g#AQ');
   if (antarctica) antarctica.setAttribute('display', 'none');
 
-  const playableIds = new Set(COUNTRIES.map((c) => c.id.toUpperCase()));
+  // Known/registered-so-far countries get a gold outline; anyone's island
+  // typed in later (see ensureCountryRegistered) gets the same treatment
+  // applied the moment it's registered.
+  const playableIds = new Set([...countryRegistry.keys()].map((id) => id.toUpperCase()));
   svg.querySelectorAll('g[id]').forEach((g) => {
     if (!/^[A-Z]{2}$/.test(g.id)) return;
     const playable = playableIds.has(g.id);
@@ -577,22 +688,57 @@ async function loadWorldMap() {
     });
   });
 
-  const vb = svg.viewBox.baseVal;
-  if (vb && vb.width && vb.height) {
-    COUNTRIES.forEach((c) => {
-      const g = svg.querySelector('g#' + c.id.toUpperCase());
-      if (!g) return;
-      try {
-        const box = g.getBBox();
-        if (box.width && box.height) {
-          c.mapX = ((box.x + box.width / 2) / vb.width) * 100;
-          c.mapY = ((box.y + box.height / 2) / vb.height) * 100;
-        }
-      } catch (err) { /* getBBox can throw on a detached/empty group — keep fallback */ }
-    });
-  }
-
+  countryRegistry.forEach((c) => { if (c.id !== 'other') resolveCountryPosition(c); });
+  syncCountryRegistryFromPlayers();
   if (state.screen === 'worldmap') renderWorldMap();
+}
+
+// Highlights a country's real shape on the map as a playable destination.
+function applyPlayableStyle(g) {
+  g.querySelectorAll('path').forEach((p) => {
+    p.setAttribute('stroke', '#ffd166');
+    p.setAttribute('stroke-width', '1.6');
+  });
+}
+
+// Looks up a country's real drawn shape and refines its marker position
+// from a guess to the shape's actual center, once the SVG is loaded.
+function resolveCountryPosition(c) {
+  if (!worldSvgEl) return;
+  const g = worldSvgEl.querySelector('g#' + c.id.toUpperCase());
+  if (!g) return;
+  applyPlayableStyle(g);
+  try {
+    const vb = worldSvgEl.viewBox.baseVal;
+    const box = g.getBBox();
+    if (vb && vb.width && vb.height && box.width && box.height) {
+      c.mapX = ((box.x + box.width / 2) / vb.width) * 100;
+      c.mapY = ((box.y + box.height / 2) / vb.height) * 100;
+    }
+  } catch (err) { /* getBBox can throw on a detached/empty group — keep fallback */ }
+}
+
+// Registers a country id (any real ISO code, or 'other') so it has a map
+// marker and a nameplate-ready name/flag, refining its position from the
+// real SVG shape as soon as that's available.
+function ensureCountryRegistered(id) {
+  if (!id) return countryRegistry.get('other');
+  let c = countryRegistry.get(id);
+  if (!c) c = registerCountry(id, id === 'other' ? '🌍' : codeToFlag(id), CODE_NAMES[id] || id.toUpperCase(), 50, 50);
+  if (id !== 'other') resolveCountryPosition(c);
+  return c;
+}
+
+// Makes sure every country anyone is currently standing in or living in has
+// a registered marker, so a friend's custom-typed country shows up on
+// everyone's map, not just the person who typed it.
+function syncCountryRegistryFromPlayers() {
+  const ids = new Set();
+  Object.values(state.players).forEach((p) => {
+    if (p.country) ids.add(p.country);
+    if (p.homeCountry) ids.add(p.homeCountry);
+  });
+  ids.forEach((id) => ensureCountryRegistered(id));
 }
 
 function onlinePlayers() {
@@ -622,10 +768,11 @@ function ensureMarkerEl(c) {
 }
 
 function renderWorldMap() {
+  syncCountryRegistryFromPlayers();
   const counts = {};
   onlinePlayers().forEach((p) => { counts[p.country] = (counts[p.country] || 0) + 1; });
 
-  COUNTRIES.forEach((c) => {
+  countryRegistry.forEach((c) => {
     const rec = ensureMarkerEl(c);
     rec.el.style.left = `${c.mapX}%`;
     rec.el.style.top = `${c.mapY}%`;
@@ -668,7 +815,7 @@ const chatSendBtn = document.getElementById('chatSendBtn');
 const avatarEls = new Map(); // nameKey -> {wrap, canvas, ctx, nameplate, bubble, activity}
 
 function currentCountry() {
-  return COUNTRIES.find((c) => c.id === state.country) || COUNTRIES[0];
+  return countryRegistry.get(state.country) || countryRegistry.get(PRESET_COUNTRY_IDS[0]);
 }
 
 // The fixed community tile every island starts with, at spiral index 0.
@@ -971,7 +1118,7 @@ const decoratePaletteEl = document.getElementById('decoratePalette');
 let decorateReturnTo = 'worldmap';
 
 function homeCountryObj() {
-  return COUNTRIES.find((c) => c.id === state.homeCountry) || currentCountry();
+  return countryRegistry.get(state.homeCountry) || currentCountry();
 }
 
 function openDecorate(returnTo) {
@@ -1121,7 +1268,7 @@ function renderOnlinePanel() {
   });
 
   onlineListEl.innerHTML = '';
-  COUNTRIES.forEach((c) => {
+  countryRegistry.forEach((c) => {
     const list = byCountry[c.id];
     if (!list || !list.length) return;
     const group = document.createElement('div');
@@ -1148,6 +1295,7 @@ function renderOnlinePanel() {
 
 function onPlayersUpdate(all) {
   state.players = all;
+  syncCountryRegistryFromPlayers();
 
   if (state.nameKey && !state.kicked) {
     const mine = all[state.nameKey];
