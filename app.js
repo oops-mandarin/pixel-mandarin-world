@@ -178,10 +178,10 @@ const WRITE_THROTTLE_MS = 300;
 // CHARACTER RENDERING (pixel art on canvas)
 // ============================================================
 
-// A denser logical pixel grid than the original 32x40 — more blocks per
-// character, room for an outline + simple cel-shading, closer to a chunky
+// A denser logical pixel grid — more blocks per character (eyebrows, nose,
+// collar, sleeve cuffs, belt, hair strands, shoe highlights) for a chunkier
 // retro-RPG sprite instead of flat color blocks.
-const CHAR_W = 48, CHAR_H = 60;
+const CHAR_W = 64, CHAR_H = 80;
 const OUTLINE = '#1b1420';
 
 function shadeColor(hex, amt) {
@@ -215,77 +215,113 @@ function drawCharacter(ctx, look) {
 
   // back hair (behind head)
   if (hairStyle === 'long') {
-    block(ctx, 9, 14, 4, 30, hairColor);
-    block(ctx, 35, 14, 4, 30, hairColor);
-    block(ctx, 35, 14, 2, 30, hairShade, false);
+    block(ctx, 12, 19, 5, 40, hairColor);
+    block(ctx, 47, 19, 5, 40, hairColor);
+    block(ctx, 47, 19, 3, 40, hairShade, false);
   } else if (hairStyle === 'ponytail') {
-    block(ctx, 35, 13, 4, 22, hairColor);
-    block(ctx, 37, 33, 4, 6, hairColor);
-    block(ctx, 35, 13, 2, 22, hairShade, false);
+    block(ctx, 47, 17, 5, 29, hairColor);
+    block(ctx, 49, 44, 5, 8, hairColor);
+    block(ctx, 47, 17, 3, 29, hairShade, false);
+    ctx.fillStyle = hairShade;
+    ctx.fillRect(48, 43, 6, 2); // hair tie
   }
 
   // arms
-  block(ctx, 5, 34, 6, 14, skin);
-  block(ctx, 37, 34, 6, 14, skin);
-  block(ctx, 5, 44, 6, 4, skinShade, false);
-  block(ctx, 37, 44, 6, 4, skinShade, false);
+  block(ctx, 7, 45, 8, 19, skin);
+  block(ctx, 49, 45, 8, 19, skin);
+  block(ctx, 7, 59, 8, 5, skinShade, false);
+  block(ctx, 49, 59, 8, 5, skinShade, false);
 
   // head
-  block(ctx, 13, 11, 22, 20, skin);
-  block(ctx, 28, 11, 7, 20, skinShade, false); // shadowed side
+  block(ctx, 17, 15, 29, 27, skin);
+  block(ctx, 37, 15, 9, 27, skinShade, false); // shadowed side
+
+  // eyebrows
+  ctx.fillStyle = hairColor;
+  ctx.fillRect(24, 22, 4, 2);
+  ctx.fillRect(36, 22, 4, 2);
+
+  // eyes + highlight
+  ctx.fillStyle = '#211a1a';
+  ctx.fillRect(24, 27, 4, 4);
+  ctx.fillRect(36, 27, 4, 4);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(25, 28, 1, 1);
+  ctx.fillRect(37, 28, 1, 1);
+
+  // nose
+  ctx.fillStyle = skinShade;
+  ctx.fillRect(31, 32, 2, 2);
 
   // blush
   ctx.fillStyle = '#ff9eb0';
-  ctx.fillRect(16, 25, 3, 2);
-  ctx.fillRect(29, 25, 3, 2);
-
-  // eyes
-  ctx.fillStyle = '#211a1a';
-  ctx.fillRect(18, 20, 3, 3);
-  ctx.fillRect(27, 20, 3, 3);
+  ctx.fillRect(21, 33, 4, 3);
+  ctx.fillRect(39, 33, 4, 3);
 
   // mouth
   ctx.fillStyle = '#7a3b3b';
-  ctx.fillRect(21, 27, 6, 2);
+  ctx.fillRect(28, 36, 8, 3);
 
   // front hair (top)
-  block(ctx, 12, 7, 24, 8, hairColor);
+  block(ctx, 16, 9, 32, 11, hairColor);
   if (hairStyle === 'short') {
-    block(ctx, 11, 15, 3, 6, hairColor);
-    block(ctx, 34, 15, 3, 6, hairColor);
+    block(ctx, 15, 20, 4, 8, hairColor);
+    block(ctx, 45, 20, 4, 8, hairColor);
+    block(ctx, 22, 17, 4, 4, hairColor);
+    block(ctx, 30, 16, 4, 4, hairColor);
+    block(ctx, 38, 17, 4, 4, hairColor);
   } else if (hairStyle === 'curly') {
-    block(ctx, 10, 9, 5, 5, hairColor);
-    block(ctx, 16, 11, 5, 5, hairColor);
-    block(ctx, 22, 9, 5, 5, hairColor);
-    block(ctx, 28, 11, 5, 5, hairColor);
-    block(ctx, 34, 9, 5, 5, hairColor);
+    block(ctx, 13, 12, 7, 7, hairColor);
+    block(ctx, 21, 15, 7, 7, hairColor);
+    block(ctx, 29, 12, 7, 7, hairColor);
+    block(ctx, 37, 15, 7, 7, hairColor);
+    block(ctx, 45, 12, 7, 7, hairColor);
+    block(ctx, 17, 20, 6, 6, hairColor);
+    block(ctx, 41, 20, 6, 6, hairColor);
   } else if (hairStyle === 'long' || hairStyle === 'ponytail') {
-    block(ctx, 11, 15, 3, 6, hairColor);
-    block(ctx, 34, 15, 3, 6, hairColor);
+    block(ctx, 15, 20, 4, 8, hairColor);
+    block(ctx, 45, 20, 4, 8, hairColor);
   }
-  block(ctx, 30, 7, 6, 8, hairShade, false);
+  block(ctx, 40, 9, 8, 11, hairShade, false);
 
   // body / outfit base
-  block(ctx, 12, 33, 24, 18, outfitColor);
-  block(ctx, 30, 33, 6, 18, outfitShade, false);
+  block(ctx, 16, 44, 32, 24, outfitColor);
+  block(ctx, 40, 44, 8, 24, outfitShade, false);
+
+  // short sleeves over the top of the arms
+  block(ctx, 6, 45, 10, 8, outfitColor);
+  block(ctx, 48, 45, 10, 8, outfitColor);
+  block(ctx, 6, 45, 10, 2, outfitShade, false);
+  block(ctx, 48, 45, 10, 2, outfitShade, false);
+
+  // collar
+  ctx.fillStyle = outfitShade;
+  ctx.fillRect(27, 44, 10, 2);
 
   if (outfitStyle === 'hoodie') {
-    block(ctx, 12, 29, 6, 6, outfitColor);
-    block(ctx, 30, 29, 6, 6, outfitColor);
+    block(ctx, 16, 39, 8, 8, outfitColor);
+    block(ctx, 40, 39, 8, 8, outfitColor);
   } else if (outfitStyle === 'dress') {
-    block(ctx, 9, 45, 30, 9, outfitColor);
-    block(ctx, 33, 45, 6, 9, outfitShade, false);
+    block(ctx, 12, 60, 40, 12, outfitColor);
+    block(ctx, 44, 60, 8, 12, outfitShade, false);
   } else if (outfitStyle === 'sporty') {
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(12, 39, 24, 3);
+    ctx.fillRect(16, 52, 32, 4);
   }
 
+  // belt
+  ctx.fillStyle = '#2b2b2b';
+  ctx.fillRect(16, 63, 32, 3);
+
   // legs / shoes
-  block(ctx, 15, 51, 6, 9, '#3a3a52');
-  block(ctx, 27, 51, 6, 9, '#3a3a52');
+  block(ctx, 20, 68, 8, 12, '#3a3a52');
+  block(ctx, 36, 68, 8, 12, '#3a3a52');
   ctx.fillStyle = '#242436';
-  ctx.fillRect(15, 57, 6, 3);
-  ctx.fillRect(27, 57, 6, 3);
+  ctx.fillRect(20, 76, 8, 4);
+  ctx.fillRect(36, 76, 8, 4);
+  ctx.fillStyle = '#4a4a68';
+  ctx.fillRect(20, 76, 8, 1);
+  ctx.fillRect(36, 76, 8, 1);
 }
 
 // ============================================================
